@@ -3,7 +3,9 @@ import { COLORS, GAME_HEIGHT, GAME_WIDTH, HUD_HEIGHT, LevelConfig, PANEL_HEIGHT,
 import { Cell, DIRS, Dir, Maze, dirFromDelta, generateMaze } from '../maze';
 import { Mover } from '../mover';
 
-type ItemKind = 'hourglass';
+type ItemKind = 'hourglass' | 'disguise';
+
+const ITEM_NAMES: Record<ItemKind, string> = { hourglass: 'Reloj de arena', disguise: 'Disfraz de policía' };
 
 interface Pickup {
   kind: ItemKind;
@@ -38,6 +40,7 @@ export class GameScene extends Phaser.Scene {
   private wanted: Dir | null = null;
   private heldKeys: Array<{ keys: Phaser.Input.Keyboard.Key[]; dir: Dir }> = [];
   private slowedUntil = 0;
+  private disguisedUntil = 0;
   private cops: Cop[] = [];
   private pickups: Pickup[] = [];
   private inventory: ItemKind[] = [];
@@ -66,6 +69,7 @@ export class GameScene extends Phaser.Scene {
     this.wanted = null;
     this.heldKeys = [];
     this.slowedUntil = 0;
+    this.disguisedUntil = 0;
     this.bonusLeft = 0;
     this.elapsed = 0;
     this.captures = 0;
@@ -149,21 +153,24 @@ export class GameScene extends Phaser.Scene {
     const isSpecial = (c: Cell) =>
       (c.x === this.maze.entrance.x && c.y === this.maze.entrance.y) || (c.x === this.maze.exit.x && c.y === this.maze.exit.y);
     // Preferir callejones sin salida a una distancia razonable de la entrada.
+    const kinds: ItemKind[] = [
+      ...new Array<ItemKind>(Math.min(this.cfg.hourglasses, RULES.maxHourglassesPerMaze)).fill('hourglass'),
+      ...new Array<ItemKind>(this.cfg.disguises).fill('disguise'),
+    ];
     let candidates = this.maze.deadEnds().filter((c) => !isSpecial(c) && fromStart[c.y][c.x] >= maxD * 0.25);
-    if (candidates.length < this.cfg.hourglasses) {
+    if (candidates.length < kinds.length) {
       candidates = [];
       for (let y = 0; y < this.maze.rows; y++) for (let x = 0; x < this.maze.cols; x++) if (!isSpecial({ x, y })) candidates.push({ x, y });
     }
     Phaser.Utils.Array.Shuffle(candidates);
-    const count = Math.min(this.cfg.hourglasses, RULES.maxHourglassesPerMaze, candidates.length);
-    for (let i = 0; i < count; i++) {
+    kinds.slice(0, candidates.length).forEach((kind, i) => {
       const cell = candidates[i];
       const c = this.cellCenter(cell.x, cell.y);
       const sprite = this.add.graphics({ x: c.x, y: c.y }).setDepth(3);
-      drawHourglass(sprite, this.cellSize * 0.5);
+      drawItem(sprite, kind, this.cellSize * 0.5);
       this.tweens.add({ targets: sprite, scale: { from: 0.85, to: 1.1 }, duration: 600, yoyo: true, repeat: -1 });
-      this.pickups.push({ kind: 'hourglass', cell, sprite });
-    }
+      this.pickups.push({ kind, cell, sprite });
+    });
   }
 
   private spawnCops(size: number): void {
@@ -229,7 +236,8 @@ export class GameScene extends Phaser.Scene {
     this.slotGroup.forEach((slot, i) => {
       const icon = slot.list[1] as Phaser.GameObjects.Graphics;
       icon.clear();
-      if (this.inventory[i] === 'hourglass') drawHourglass(icon, 30);
+      const kind = this.inventory[i];
+      if (kind) drawItem(icon, kind, 30);
     });
   }
 
@@ -298,6 +306,9 @@ export class GameScene extends Phaser.Scene {
     if (kind === 'hourglass') {
       this.bonusLeft += RULES.hourglassSeconds;
       this.flashMessage('¡Tiempo detenido!', '#f5a623');
+    } else if (kind === 'disguise') {
+      this.disguisedUntil = this.elapsed + RULES.disguiseMs;
+      this.flashMessage('¡Disfrazado de policía!', '#7fa8ff');
     }
     this.refreshPanel();
   }
@@ -339,7 +350,7 @@ export class GameScene extends Phaser.Scene {
         p.sprite.destroy();
         this.pickups.splice(i, 1);
         this.refreshPanel();
-        this.flashMessage('+ Reloj de arena', '#f5a623');
+        this.flashMessage(`+ ${ITEM_NAMES[p.kind]}`, p.kind === 'hourglass' ? '#f5a623' : '#7fa8ff');
       }
     }
 
@@ -374,7 +385,8 @@ export class GameScene extends Phaser.Scene {
     const options = this.maze.neighbors(c);
     if (options.length === 0) return null;
     const d = toThief[c.y][c.x];
-    if (d >= 0 && d <= this.cfg.detectRange) {
+    const disguised = this.elapsed < this.disguisedUntil;
+    if (!disguised && d >= 0 && d <= this.cfg.detectRange) {
       // Persecución: tomar el vecino más cercano al ladrón.
       let best = options[0];
       for (const n of options) if (toThief[n.y][n.x] < toThief[best.y][best.x]) best = n;
@@ -389,6 +401,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onCaught(cop: Cop, now: number): void {
+    if (now < this.disguisedUntil) {
+      // Con el disfraz no hay captura: el choque solo hace caer el disfraz y desconcierta al policía.
+      this.disguisedUntil = 0;
+      cop.stunnedUntil = now + RULES.copStunMs;
+      this.flashMessage('¡Se cayó el disfraz!', '#7fa8ff');
+      return;
+    }
     this.captures++;
     this.slowedUntil = now + RULES.slowMs;
     cop.stunnedUntil = now + RULES.copStunMs;
@@ -422,8 +441,13 @@ export class GameScene extends Phaser.Scene {
     this.bonusText.setText(paused ? `⏳ ${Math.ceil(this.bonusLeft)}s` : '');
 
     const slowed = now < this.slowedUntil;
-    this.thiefRect.setFillStyle(slowed ? COLORS.thiefSlow : COLORS.thief);
-    this.statusText.setText(slowed ? 'Ralentizado' : '');
+    const disguised = now < this.disguisedUntil;
+    this.thiefRect.setFillStyle(disguised ? COLORS.cop : slowed ? COLORS.thiefSlow : COLORS.thief);
+    this.thiefRect.setStrokeStyle(2, disguised ? 0xffffff : 0x000000, disguised ? 0.5 : 0.4);
+    const status: string[] = [];
+    if (disguised) status.push(`Disfraz ${Math.ceil((this.disguisedUntil - now) / 1000)}s`);
+    if (slowed) status.push('Ralentizado');
+    this.statusText.setText(status.join(' · '));
     for (const cop of this.cops) {
       const stunned = now < cop.stunnedUntil;
       cop.rect.setFillStyle(stunned ? COLORS.copStunned : COLORS.cop);
@@ -437,8 +461,24 @@ export class GameScene extends Phaser.Scene {
   }
 }
 
+export function drawItem(g: Phaser.GameObjects.Graphics, kind: ItemKind, size: number): void {
+  if (kind === 'hourglass') drawHourglass(g, size);
+  else drawDisguise(g, size);
+}
+
+// Disfraz: un cuadro azul de policía con el ladrón amarillo asomando en el centro.
+function drawDisguise(g: Phaser.GameObjects.Graphics, size: number): void {
+  const h = size / 2;
+  g.fillStyle(COLORS.cop, 1);
+  g.fillRect(-h, -h, size, size);
+  g.lineStyle(Math.max(1.5, size / 14), 0xffffff, 0.9);
+  g.strokeRect(-h, -h, size, size);
+  g.fillStyle(COLORS.thief, 1);
+  g.fillRect(-size / 6, -size / 6, size / 3, size / 3);
+}
+
 // Reloj de arena dibujado con dos triángulos, centrado en (0,0).
-export function drawHourglass(g: Phaser.GameObjects.Graphics, size: number): void {
+function drawHourglass(g: Phaser.GameObjects.Graphics, size: number): void {
   const h = size / 2;
   const w = size * 0.4;
   g.fillStyle(COLORS.hourglass, 1);

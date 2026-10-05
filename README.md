@@ -10,12 +10,13 @@ Eres el cuadro amarillo (el ladrón). Empiezas en la entrada y tienes que llegar
 - No hay vidas: si un policía te atrapa, vas a mitad de velocidad durante 3 s, el policía queda aturdido 1,5 s y te quita un artefacto al azar si llevas alguno.
 - Pierdes solo si se acaba el reloj del nivel.
 - **Reloj de arena** (máximo 2 por laberinto): al usarlo, el reloj del nivel se detiene y un segundo reloj consume 15 s de tiempo extra. Cuando se vacía, el reloj del nivel sigue donde estaba.
+- **Disfraz de policía** (1 por laberinto): durante 8 s el ladrón se ve como policía y los policías lo ignoran. Si un policía choca con él, el disfraz se cae pero no lo atrapa.
 - Los policías patrullan y te persiguen cuando estás cerca. Cada nivel es más grande, con policías más rápidos y, desde el nivel 3, más policías.
 
 ## Controles
 
 - Celular: desliza el dedo en cualquier parte de la pantalla para cambiar de dirección. Toca un artefacto del panel inferior para usarlo.
-- Computadora: flechas o WASD para moverte, espacio para usar el primer artefacto, P o Esc para pausar.
+- Computadora: flechas o WASD para moverte (si mantienes una tecla, giras en el siguiente cruce posible), espacio para usar el primer artefacto, P o Esc para pausar.
 
 ## Desarrollo
 

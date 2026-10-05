@@ -28,6 +28,7 @@ export const RULES = {
   copStunMs: 1500, // el policía queda aturdido tras atrapar para no repetir la captura
   hourglassSeconds: 15, // tiempo extra que consume el segundo reloj
   maxHourglassesPerMaze: 2,
+  disguiseMs: 8000, // el disfraz de policía dura 8 s y se cae si un policía choca con el ladrón
   inventorySlots: 3,
 };
 
@@ -39,6 +40,7 @@ export interface LevelConfig {
   copSpeed: number;
   detectRange: number; // a cuántos pasos el policía "ve" al ladrón y lo persigue
   hourglasses: number;
+  disguises: number;
 }
 
 export function levelConfig(level: number): LevelConfig {
@@ -50,7 +52,8 @@ export function levelConfig(level: number): LevelConfig {
     cops: level < 3 ? 1 : level < 6 ? 2 : 3,
     copSpeed: Math.min(3.6 + 0.2 * (level - 1), 4.6),
     detectRange: Math.min(7 + level, 14),
-    hourglasses: level === 1 ? 1 : 2,
+    hourglasses: RULES.maxHourglassesPerMaze,
+    disguises: 1,
   };
 }
 
