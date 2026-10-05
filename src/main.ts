@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from './config';
 import { GameScene } from './scenes/GameScene';
+import { LevelsScene } from './scenes/LevelsScene';
 import { MenuScene } from './scenes/MenuScene';
 import { PauseScene } from './scenes/PauseScene';
 import { ResultScene } from './scenes/ResultScene';
+import { SkinsScene } from './scenes/SkinsScene';
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'juego',
   width: GAME_WIDTH,
@@ -17,5 +19,8 @@ new Phaser.Game({
   },
   render: { antialias: true },
   input: { activePointers: 2 },
-  scene: [MenuScene, GameScene, PauseScene, ResultScene],
+  scene: [MenuScene, GameScene, PauseScene, ResultScene, LevelsScene, SkinsScene],
 });
+
+// Acceso para pruebas automáticas desde el navegador.
+(window as unknown as { __juego: Phaser.Game }).__juego = game;
