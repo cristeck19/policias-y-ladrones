@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIRS, E, Maze, N, S, W, generateMaze, seededRng } from '../src/maze';
-import { Mover } from '../src/mover';
+import { generateMaze, seededRng } from '../src/maze';
 
 describe('generateMaze', () => {
   it('conecta todas las celdas y la entrada con la salida', () => {
@@ -38,40 +37,5 @@ describe('generateMaze', () => {
     const dist = m.distancesFrom(m.exit);
     const step = m.nextStepTowards(m.entrance, m.exit)!;
     expect(dist[step.y][step.x]).toBe(dist[m.entrance.y][m.entrance.x] - 1);
-  });
-});
-
-describe('Mover.tryTurn', () => {
-  // Laberinto de 3x2: pasillo inferior de 3 celdas con salida hacia arriba solo en la celda del medio.
-  const maze = new Maze(3, 2, [
-    [N | W | S, N | E | W, N | E | S],
-    [N | W | S, S, N | E | S],
-  ]);
-
-  it('gira aunque la tecla llegue un poco tarde', () => {
-    const m = new Mover({ x: 1, y: 1 });
-    m.target = { x: 2, y: 1 };
-    m.dir = DIRS[1]; // derecha
-    m.progress = 0.3;
-    expect(m.tryTurn(maze, DIRS[0], 0.45)).toBe(true);
-    expect(m.cell).toEqual({ x: 1, y: 1 });
-    expect(m.target).toBeNull();
-  });
-
-  it('gira aunque la tecla llegue un poco antes', () => {
-    const m = new Mover({ x: 0, y: 1 });
-    m.target = { x: 1, y: 1 };
-    m.dir = DIRS[1];
-    m.progress = 0.7;
-    expect(m.tryTurn(maze, DIRS[0], 0.45)).toBe(true);
-    expect(m.cell).toEqual({ x: 1, y: 1 });
-  });
-
-  it('no gira donde hay pared', () => {
-    const m = new Mover({ x: 1, y: 1 });
-    m.target = { x: 2, y: 1 };
-    m.dir = DIRS[1];
-    m.progress = 0.7;
-    expect(m.tryTurn(maze, DIRS[0], 0.45)).toBe(false);
   });
 });

@@ -25,8 +25,6 @@ export interface GameResult {
 }
 
 const SWIPE_MIN = 18;
-const TURN_TOLERANCE = 0.45; // fracción de celda en la que se acepta un giro tarde o anticipado
-const WANT_BUFFER_MS = 450; // cuánto se recuerda una dirección pedida que aún no se pudo tomar
 
 export class GameScene extends Phaser.Scene {
   private cfg!: LevelConfig;
@@ -38,8 +36,6 @@ export class GameScene extends Phaser.Scene {
   private thief!: Mover;
   private thiefRect!: Phaser.GameObjects.Rectangle;
   private wanted: Dir | null = null;
-  private wantedAt = 0;
-  private heldKeys: Array<{ keys: Phaser.Input.Keyboard.Key[]; dir: Dir }> = [];
   private slowedUntil = 0;
   private cops: Cop[] = [];
   private pickups: Pickup[] = [];
@@ -67,8 +63,6 @@ export class GameScene extends Phaser.Scene {
     this.pickups = [];
     this.inventory = [];
     this.wanted = null;
-    this.wantedAt = 0;
-    this.heldKeys = [];
     this.slowedUntil = 0;
     this.bonusLeft = 0;
     this.elapsed = 0;
@@ -266,13 +260,8 @@ export class GameScene extends Phaser.Scene {
 
     const kb = this.input.keyboard;
     if (kb) {
-      const bind = (keys: string[], dx: number, dy: number) => {
-        const d = dirFromDelta(dx, dy);
-        if (!d) return;
-        keys.forEach((k) => kb.on(`keydown-${k}`, () => this.setWanted(d)));
-        // Mantener la tecla presionada también sirve: el ladrón gira en el siguiente cruce posible.
-        this.heldKeys.push({ keys: keys.map((k) => kb.addKey(k)), dir: d });
-      };
+      const bind = (keys: string[], dx: number, dy: number) =>
+        keys.forEach((k) => kb.on(`keydown-${k}`, () => { const d = dirFromDelta(dx, dy); if (d) this.setWanted(d); }));
       bind(['UP', 'W'], 0, -1);
       bind(['DOWN', 'S'], 0, 1);
       bind(['LEFT', 'A'], -1, 0);
@@ -285,7 +274,6 @@ export class GameScene extends Phaser.Scene {
 
   private setWanted(d: Dir): void {
     this.wanted = d;
-    this.wantedAt = this.elapsed;
     // Dar media vuelta es inmediato aunque esté entre dos celdas.
     if (this.thief.dir && this.thief.dir.bit === d.opposite) this.thief.reverse();
   }
@@ -322,18 +310,7 @@ export class GameScene extends Phaser.Scene {
       this.timeLeft = Math.max(0, this.timeLeft - dt);
     }
 
-    // Ladrón: dirección pedida (tecla mantenida o pedido reciente) y giro con tolerancia en los cruces.
-    for (const h of this.heldKeys) {
-      if (h.keys.some((k) => k.isDown) && (!this.thief.dir || h.dir.bit !== this.thief.dir.bit)) {
-        this.wanted = h.dir;
-        this.wantedAt = now;
-      }
-    }
-    if (this.wanted && now - this.wantedAt > WANT_BUFFER_MS && (!this.thief.dir || this.wanted.bit !== this.thief.dir.bit)) {
-      this.wanted = null;
-    }
-    if (this.wanted) this.thief.tryTurn(this.maze, this.wanted, TURN_TOLERANCE);
-
+    // Ladrón
     const slowed = now < this.slowedUntil;
     const thiefSpeed = RULES.thiefSpeed * (slowed ? RULES.slowFactor : 1);
     this.thief.advance(dt, thiefSpeed, this.maze, () => {
