@@ -36,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   private thief!: Mover;
   private thiefRect!: Phaser.GameObjects.Rectangle;
   private wanted: Dir | null = null;
+  private heldKeys: Array<{ keys: Phaser.Input.Keyboard.Key[]; dir: Dir }> = [];
   private slowedUntil = 0;
   private cops: Cop[] = [];
   private pickups: Pickup[] = [];
@@ -63,6 +64,7 @@ export class GameScene extends Phaser.Scene {
     this.pickups = [];
     this.inventory = [];
     this.wanted = null;
+    this.heldKeys = [];
     this.slowedUntil = 0;
     this.bonusLeft = 0;
     this.elapsed = 0;
@@ -260,8 +262,13 @@ export class GameScene extends Phaser.Scene {
 
     const kb = this.input.keyboard;
     if (kb) {
-      const bind = (keys: string[], dx: number, dy: number) =>
-        keys.forEach((k) => kb.on(`keydown-${k}`, () => { const d = dirFromDelta(dx, dy); if (d) this.setWanted(d); }));
+      const bind = (keys: string[], dx: number, dy: number) => {
+        const d = dirFromDelta(dx, dy);
+        if (!d) return;
+        keys.forEach((k) => kb.on(`keydown-${k}`, () => this.setWanted(d)));
+        // Mantener la tecla presionada también sirve: el ladrón gira en el siguiente cruce posible.
+        this.heldKeys.push({ keys: keys.map((k) => kb.addKey(k)), dir: d });
+      };
       bind(['UP', 'W'], 0, -1);
       bind(['DOWN', 'S'], 0, 1);
       bind(['LEFT', 'A'], -1, 0);
@@ -310,7 +317,10 @@ export class GameScene extends Phaser.Scene {
       this.timeLeft = Math.max(0, this.timeLeft - dt);
     }
 
-    // Ladrón
+    // Ladrón: una tecla mantenida pide su dirección continuamente.
+    for (const h of this.heldKeys) {
+      if (h.keys.some((k) => k.isDown) && (!this.thief.dir || h.dir.bit !== this.thief.dir.bit)) this.wanted = h.dir;
+    }
     const slowed = now < this.slowedUntil;
     const thiefSpeed = RULES.thiefSpeed * (slowed ? RULES.slowFactor : 1);
     this.thief.advance(dt, thiefSpeed, this.maze, () => {
