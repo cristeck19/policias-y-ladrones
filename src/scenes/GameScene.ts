@@ -675,8 +675,8 @@ export class GameScene extends Phaser.Scene {
     this.syncSprites();
     this.updateHud(now);
 
-    const t = this.thief.cell;
-    if (!this.thief.target && sameCell(t, this.maze.exit)) this.finish(true);
+    // Basta con pisar la salida, aunque el ladrón venga por un pasillo y no se detenga en ella.
+    if (sameCell(this.thief.nearestCell, this.maze.exit)) this.finish(true);
     else if (this.timeLeft <= 0) this.finish(false);
   }
 
