@@ -52,6 +52,25 @@ export class Mover {
     }
   }
 
+  // Giro con tolerancia: si la dirección pedida es perpendicular y el cuadro acaba de pasar
+  // por un cruce (o está por llegar a uno) donde se puede girar, se ajusta a esa celda y gira ahí.
+  tryTurn(maze: Maze, d: Dir, tolerance: number): boolean {
+    if (!this.target || !this.dir) return false;
+    if (d.bit === this.dir.bit || d.bit === this.dir.opposite) return false;
+    if (this.progress <= tolerance && maze.canMove(this.cell.x, this.cell.y, d)) {
+      this.target = null;
+      this.progress = 0;
+      return true;
+    }
+    if (this.progress >= 1 - tolerance && maze.canMove(this.target.x, this.target.y, d)) {
+      this.cell = this.target;
+      this.target = null;
+      this.progress = 0;
+      return true;
+    }
+    return false;
+  }
+
   // Permite dar media vuelta en medio de un pasillo sin esperar a llegar a la celda.
   reverse(): void {
     if (!this.target || !this.dir) return;
